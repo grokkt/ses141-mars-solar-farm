@@ -51,19 +51,12 @@ const calcEnergyProduction = ({
 class SolarPanel {
   width: number;
   length: number;
-  powerPerDay: number;
   coordinates: Vector3;
 
   constructor(width: number, length: number, coordinates: Vector3) {
     this.width = width;
     this.length = length;
     this.coordinates = coordinates;
-    const ppd = (width * length) + 15;
-    this.powerPerDay = ppd;
-  }
-
-  getPowerPerDay(): number {
-    return this.powerPerDay;
   }
 
   getSqFt(): number {
@@ -73,15 +66,15 @@ class SolarPanel {
 
 type SolarPanelsContextT = {
   panels: SolarPanel[];
-  currentPPD: number;
-  currentPPY: number;
+  PPDJoules: number;
+  PPYJoules: number;
+  PPDKWH: number;
+  PPYKWH: number;
   totalSqFt: number;
   addPanel: (panel: SolarPanel) => void;
 };
 
 const SolarPanelsContext = createContext<SolarPanelsContextT | undefined>(undefined);
-
-
 
 //-----------------------------------------
 //------------------ Mars 3D model
@@ -183,10 +176,35 @@ const MainScene = () => {
       <div className="absolute top-4 right-12 !w-[25vw] !h-[40vh] flex flex-col border-2">
         <div className="col-span-1 w-full border p-2 flex flex-row text-white">
           <div className="w-2/3">
-            Watts per 24 hours
+            Total Panel Area (sqft)
           </div>
           <div className="w-1/3">
-            {PanelContext ? `${PanelContext.currentPPD}` : "Loading..."}
+            {PanelContext ? `${PanelContext.totalSqFt}` : "Loading..."}
+          </div>
+        </div>
+        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+          <div className="w-2/3">
+            Total Energy (per 24 hours)
+          </div>
+          <div className="w-1/3">
+            {PanelContext ? `${PanelContext.PPDJoules} Joules` : "Loading..."}
+          </div>
+        </div>
+        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+          <div className="w-2/3">
+            Total Energy (per Earth year)
+          </div>
+          <div className="w-1/3">
+            {PanelContext ? `${PanelContext.PPYJoules} Joules` : "Loading..."}
+          </div>
+        </div>
+
+        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+          <div className="w-2/3">
+            Total Power (per 24 hours)
+          </div>
+          <div className="w-1/3">
+            {PanelContext ? `${PanelContext.PPDKWH} kWh` : "Loading..."}
           </div>
         </div>
         <div className="col-span-1 w-full border p-2 flex flex-row text-white">
@@ -194,18 +212,9 @@ const MainScene = () => {
             Total Power (per Earth year)
           </div>
           <div className="w-1/3">
-            {PanelContext ? `${PanelContext.currentPPY}` : "Loading..."}
+            {PanelContext ? `${PanelContext.PPYKWH} kWh` : "Loading..."}
           </div>
         </div>
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
-          <div className="w-2/3">
-            Total Panel Area (ft^2)
-          </div>
-          <div className="w-1/3">
-            {PanelContext ? `${PanelContext.totalSqFt}` : "Loading..."}
-          </div>
-        </div>
-
       </div>
       <div className="flex justify-center items-center w-screen h-screen bg-gray-800">
         <div className="flex flex-col items-center">
@@ -242,24 +251,34 @@ const MainScene = () => {
 const App = () => {
 
   const [panels, setPanels] = useState<SolarPanel[]>([]);
-  const [currentPPD, setCurrentPPD] = useState(0);
-  const [currentPPY, setCurrentPPY] = useState(0);
   const [totalSqFt, setTotalSqFt] = useState(0);
+
+  const [ppdJoules, setPPDJoules] = useState(0);
+  const [ppyJoules, setPPYJoules] = useState(0);
+  const [ppdKWH, setPPDKWH] = useState(0);
+  const [ppyKWH, setPPYKWH] = useState(0);
+
+  const [efficPercent, setEfficPercent] = useState(20);
+  const [solarIrr, setSolarIrr] = useState(50);
 
   const addPanel = useCallback((panel: SolarPanel) => {
     setPanels((prevPanels) => {
       const updatedPanels = [...prevPanels, panel];
-
-      var totalPPD = 0;
       var totalSqFt = 0;
-
       updatedPanels.forEach((panel) => {
-        totalPPD += panel.getPowerPerDay();
         totalSqFt += panel.getSqFt();
       });
 
-      setCurrentPPD(totalPPD);
-      setCurrentPPY(totalPPD * 365);
+      const power = calcEnergyProduction({
+        areaInSqFt: totalSqFt,
+        panelEffic: efficPercent,
+        solarIrradiance: solarIrr
+      });
+
+      setPPDJoules(power.dailyEnergyJoules);
+      setPPYJoules(power.annualEnergyJoules);
+      setPPDKWH(power.dailyEnergyKWH);
+      setPPYKWH(power.annualEnergyKWH);
       setTotalSqFt(totalSqFt);
 
       return updatedPanels;
@@ -269,12 +288,14 @@ const App = () => {
   const value: SolarPanelsContextT = useMemo(() => {
     return {
       panels,
-      currentPPD,
-      currentPPY,
+      PPDJoules: ppdJoules,
+      PPYJoules: ppyJoules,
+      PPDKWH: ppdKWH,
+      PPYKWH: ppyKWH,
       totalSqFt,
       addPanel
     };
-  }, [panels.length, currentPPD, currentPPY, totalSqFt])
+  }, [panels.length, totalSqFt])
 
   return (
     <SolarPanelsContext.Provider value={value}>
