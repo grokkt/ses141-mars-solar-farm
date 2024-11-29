@@ -1,4 +1,4 @@
-import {createContext, useContext, useEffect, useCallback, useState, useRef } from 'react'
+import {createContext, useMemo, useContext, useEffect, useCallback, useState, useRef } from 'react'
 // import reactLogo from './assets/react.svg'
 // import viteLogo from '/vite.svg'
 import './App.css'
@@ -8,6 +8,46 @@ import { Canvas, useLoader, useFrame } from "@react-three/fiber";
 import MARS_TEXTURE from "../public/Mars.jpg";
 
 //------------- Context for panels
+const SECONDS_PER_EARTH_DAY = 86400;
+
+// solarIrradiance max = 60.0 W/sqft, min = 10W/sqft, default: 50W/sqft
+
+interface EnergyProd {
+  dailyEnergyJoules: number,
+  dailyEnergyKWH: number,
+  annualEnergyJoules: number,
+  annualEnergyKWH: number,
+}
+
+const calcEnergyProduction = ({
+  areaInSqFt,
+  panelEffic,
+  solarIrradiance,
+}:{
+  areaInSqFt: number;
+  panelEffic: number;
+  solarIrradiance: number;
+}): EnergyProd => {
+  // power per sqft per second
+  const power_psqft = solarIrradiance * panelEffic;
+
+  // energy per sqft per 24 hours in Joules
+  const energy_psqft_pday = power_psqft * SECONDS_PER_EARTH_DAY;
+
+  // energy for area per day Joules
+  const energy_pday_joules = energy_psqft_pday * areaInSqFt;
+
+  // power for area per day in kWH
+  const energy_pday_kwh = energy_pday_joules / 3_600_000;
+
+  return {
+    dailyEnergyJoules: energy_pday_joules,
+    dailyEnergyKWH: energy_pday_kwh,
+    annualEnergyJoules: energy_pday_joules * 365.25,
+    annualEnergyKWH: energy_pday_kwh * 365.25
+  }
+}
+
 class SolarPanel {
   width: number;
   length: number;
@@ -31,42 +71,25 @@ class SolarPanel {
   }
 }
 
-class SolarPanelsContextT {
-  panels: SolarPanel[] = [];
-  currentPPD: number = 0;
-  currentPPY: number = 0;
-  totalSqFt: number = 0;
-
-  // every time a new panel is added, update PPD/PPY/Square Feet
-  addPanel(panel: SolarPanel): void {
-
-    this.panels.push(panel);
-
-    var totalPPD = 0;
-    var sqft = 0;
-    for (let i = 0; i < this.panels.length; i++) {
-      const p = this.panels[i];
-      totalPPD += p.getPowerPerDay();
-      sqft += p.getSqFt();
-    }
-
-    this.currentPPD = totalPPD;
-    this.currentPPY = totalPPD * 365;
-    this.totalSqFt = sqft;
-  }
-}
+type SolarPanelsContextT = {
+  panels: SolarPanel[];
+  currentPPD: number;
+  currentPPY: number;
+  totalSqFt: number;
+  addPanel: (panel: SolarPanel) => void;
+};
 
 const SolarPanelsContext = createContext<SolarPanelsContextT | undefined>(undefined);
 
 
+
+//-----------------------------------------
+//------------------ Mars 3D model
+
 const MarsModel = ({
-    // setxr,
-    // setyr,
     xr,
     yr
 }:{
-    // setxr: (amt: number) => void;
-    // setyr: (amt: number) => void;
     xr: number;
     yr: number;
 }) => {
@@ -74,7 +97,9 @@ const MarsModel = ({
   const texture = useLoader(TextureLoader, MARS_TEXTURE);
   const marsRadius = 1;
 
-  const [panels, setPanels] = useState<{ position: [number, number, number] }[]>([]);
+  const panelctx = useContext(SolarPanelsContext);
+
+  // const [panels, setPanels] = useState<{ position: [number, number, number] }[]>([]);
 
   const handlePointerDown = (event: any) => {
     // get intersect point
@@ -89,7 +114,13 @@ const MarsModel = ({
       position.applyMatrix4(planetRotationMatrix);
     }
 
-    setPanels((prev) => [...prev, { position: [position.x, position.y, position.z] } ]);
+    const cv = new Vector3(position.x, position.y, position.z);
+
+    // setPanels((prev) => [...prev, { position: [position.x, position.y, position.z] } ]);
+
+    const p = new SolarPanel(5, 5, cv);
+
+    panelctx?.addPanel(p);
   }
 
   const planetRef = useRef<Mesh>(null);
@@ -113,13 +144,13 @@ const MarsModel = ({
       <sphereGeometry args={[marsRadius, 256, 256]} />
       <meshStandardMaterial
         map={texture}
-        transparent={true}
-        opacity={0.8}
+        transparent={false}
+        // opacity={0.8}
       />
-      {panels.map((panel, index) => (
-        <mesh key={`panel_${index}`} position={panel.position}>
+      {panelctx?.panels.map((panel, index) => (
+        <mesh key={`panel_${index}`} position={panel.coordinates}>
           <sphereGeometry args={[0.02, 16, 16]} />
-          <meshStandardMaterial color="black"/>
+          <meshStandardMaterial color="blue"/>
         </mesh>
       ))}
     </mesh>
@@ -187,6 +218,7 @@ const MainScene = () => {
             {/* Canvas */}
             <Canvas
               className="!w-[30vw] !h-[60vh] bg-black"
+              camera={{position: [0,0,2]}}
               scene={ms}
             >
               <ambientLight intensity={10} />
@@ -209,10 +241,43 @@ const MainScene = () => {
 
 const App = () => {
 
-  const panelContext = new SolarPanelsContextT();
+  const [panels, setPanels] = useState<SolarPanel[]>([]);
+  const [currentPPD, setCurrentPPD] = useState(0);
+  const [currentPPY, setCurrentPPY] = useState(0);
+  const [totalSqFt, setTotalSqFt] = useState(0);
+
+  const addPanel = useCallback((panel: SolarPanel) => {
+    setPanels((prevPanels) => {
+      const updatedPanels = [...prevPanels, panel];
+
+      var totalPPD = 0;
+      var totalSqFt = 0;
+
+      updatedPanels.forEach((panel) => {
+        totalPPD += panel.getPowerPerDay();
+        totalSqFt += panel.getSqFt();
+      });
+
+      setCurrentPPD(totalPPD);
+      setCurrentPPY(totalPPD * 365);
+      setTotalSqFt(totalSqFt);
+
+      return updatedPanels;
+    });
+  }, []);
+
+  const value: SolarPanelsContextT = useMemo(() => {
+    return {
+      panels,
+      currentPPD,
+      currentPPY,
+      totalSqFt,
+      addPanel
+    };
+  }, [panels.length, currentPPD, currentPPY, totalSqFt])
 
   return (
-    <SolarPanelsContext.Provider value={panelContext}>
+    <SolarPanelsContext.Provider value={value}>
       <MainScene/>
     </SolarPanelsContext.Provider>
   )
