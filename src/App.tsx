@@ -92,8 +92,6 @@ const MarsModel = ({
 
   const panelctx = useContext(SolarPanelsContext);
 
-  // const [panels, setPanels] = useState<{ position: [number, number, number] }[]>([]);
-
   const handlePointerDown = (event: any) => {
     // get intersect point
     const point = event.point;
@@ -108,8 +106,6 @@ const MarsModel = ({
     }
 
     const cv = new Vector3(position.x, position.y, position.z);
-
-    // setPanels((prev) => [...prev, { position: [position.x, position.y, position.z] } ]);
 
     const p = new SolarPanel(5, 5, cv);
 
@@ -138,7 +134,6 @@ const MarsModel = ({
       <meshStandardMaterial
         map={texture}
         transparent={false}
-        // opacity={0.8}
       />
       {panelctx?.panels.map((panel, index) => (
         <mesh key={`panel_${index}`} position={panel.coordinates}>
@@ -173,8 +168,8 @@ const MainScene = () => {
 
   return (
     <>
-      <div className="absolute top-4 right-12 !w-[25vw] !h-[40vh] flex flex-col border-2">
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+      <div className="absolute top-4 right-4  !w-[35vw] !h-[40vh] flex flex-col">
+        <div className="col-span-1 w-full p-2 flex flex-row text-white">
           <div className="w-2/3">
             Total Panel Area (sqft)
           </div>
@@ -182,7 +177,7 @@ const MainScene = () => {
             {PanelContext ? `${PanelContext.totalSqFt}` : "Loading..."}
           </div>
         </div>
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+        <div className="col-span-1 w-full p-2 flex flex-row text-white">
           <div className="w-2/3">
             Total Energy (per 24 hours)
           </div>
@@ -190,7 +185,7 @@ const MainScene = () => {
             {PanelContext ? `${PanelContext.PPDJoules} Joules` : "Loading..."}
           </div>
         </div>
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+        <div className="col-span-1 w-full  p-2 flex flex-row text-white">
           <div className="w-2/3">
             Total Energy (per Earth year)
           </div>
@@ -199,7 +194,7 @@ const MainScene = () => {
           </div>
         </div>
 
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+        <div className="col-span-1 w-full  p-2 flex flex-row text-white">
           <div className="w-2/3">
             Total Power (per 24 hours)
           </div>
@@ -207,7 +202,7 @@ const MainScene = () => {
             {PanelContext ? `${PanelContext.PPDKWH} kWh` : "Loading..."}
           </div>
         </div>
-        <div className="col-span-1 w-full border p-2 flex flex-row text-white">
+        <div className="col-span-1 w-full  p-2 flex flex-row text-white">
           <div className="w-2/3">
             Total Power (per Earth year)
           </div>
@@ -216,23 +211,20 @@ const MainScene = () => {
           </div>
         </div>
       </div>
-      <div className="flex justify-center items-center w-screen h-screen bg-gray-800">
+      <div className="flex justify-center items-center pr-20 w-screen h-screen bg-gray-800">
         <div className="flex flex-col items-center">
           {/* North Button */}
           <button onClick={() => setXR(rotateAmt)} className="bg-gray-700 text-white py-2 px-4 rounded mb-4">↑</button>
           <div className="flex items-center">
             {/* West Button */}
             <button onClick={() => setYR(rotateAmt * -1)} className="bg-gray-700 text-white py-2 px-4 rounded mr-4">←</button>
-
             {/* Canvas */}
             <Canvas
-              className="!w-[30vw] !h-[60vh] bg-black"
+              className="!w-[30vw] !h-[60vh] bg-black relative"
               camera={{position: [0,0,2]}}
               scene={ms}
             >
               <ambientLight intensity={10} />
-              <Html position={[0,0,0]} className="flexxxx">
-              </Html>
               <MarsModel xr={xr} yr={yr} />
               <OrbitControls enablePan={false} enableRotate={false}/>
             </Canvas>
