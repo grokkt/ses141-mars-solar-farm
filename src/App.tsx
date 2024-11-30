@@ -6,6 +6,7 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { Scene, Vector3, TextureLoader, Mesh, BufferGeometry, SphereGeometry, Color, Matrix4 } from "three";
 import { Canvas, useLoader, useFrame } from "@react-three/fiber";
 import MARS_TEXTURE from "../public/Mars.jpg";
+import STAR_BG from "../public/star_galaxy.png";
 
 //------------- Context for panels
 const SECONDS_PER_EARTH_DAY = 86400;
@@ -229,9 +230,10 @@ const MainScene = () => {
               <button onClick={() => setYR(rotateAmt * -1)} className="bg-gray-700 text-white py-2 px-4 rounded mr-4">←</button>
               {/* Canvas */}
               <Canvas
-                className="!w-[30vw] !h-[60vh] bg-black relative"
+                className="!w-[30vw] !h-[60vh] relative rounded-xl border-2 border-gray-600"
                 camera={{position: [0,0,2]}}
                 scene={ms}
+                style={{ backgroundImage: `url(${STAR_BG})` }}
               >
                 <ambientLight intensity={10} />
                 <MarsModel xr={xr} yr={yr} />
@@ -486,7 +488,7 @@ const App = () => {
 
   return (
     <SolarPanelsContext.Provider value={value}>
-      <MainScene/>
+        <MainScene/>
     </SolarPanelsContext.Provider>
   )
 }
